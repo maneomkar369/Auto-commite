@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI PR Terminal</title>
+    <link rel="stylesheet" href="/web/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+    <div class="noise"></div>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AUTONOMOUS ENGINE</p>
+          <h1>AI PR Terminal Console</h1>
+        </div>
+        <div class="topbar-right">
+          <div class="status-pill" id="healthStatus">Checking API...</div>
+          <div class="state-chip" id="liveState">Idle</div>
+        </div>
+      </header>
+
+      <nav class="page-nav">
+        <button id="goAuthPage" class="nav-btn active">1. Authentication</button>
+        <button id="goEnginePage" class="nav-btn">2. Autonomous Engine</button>
+      </nav>
+
+      <section id="authPage" class="page-panel active">
+        <div class="grid">
+          <article class="card card-full auth-card">
+            <h2>Login & Authentication</h2>
+            <div class="auth-grid">
+              <div class="field-row">
+                <label>GitHub Token ID</label>
+                <input id="githubTokenInput" type="password" placeholder="ghp_xxxxxxxxx" />
+              </div>
+              <div class="field-row">
+                <label>Model API Key</label>
+                <input id="modelApiKeyInput" type="password" placeholder="sk-... / model key" />
+              </div>
+              <div class="field-row">
+                <label>Model URL (optional)</label>
+                <input id="ollamaUrlInput" placeholder="http://localhost:11434" />
+              </div>
+              <div class="field-row">
+                <label>Model Name (optional)</label>
+                <input id="ollamaModelInput" placeholder="qwen3.5:397b-cloud" />
+              </div>
+            </div>
+            <div class="action-row">
+              <button id="saveAuthBtn">Save & Verify Credentials</button>
+            </div>
+            <div class="action-row">
+              <button id="continueToEngineBtn" class="secondary-btn">Continue to Autonomous Engine</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="enginePage" class="page-panel">
+        <div class="grid">
+          <article class="card card-full repo-card">
+            <h2>Contribution Repo Link</h2>
+            <div class="field-row">
+              <label>GitHub Repository URL</label>
+              <input id="repoLink" placeholder="https://github.com/owner/repo" />
+            </div>
+            <div class="action-row">
+              <button id="useRepoLinkBtn">Use Link for Fork Workflow</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Internal Repo Run</h2>
+            <div class="field-row">
+              <label>Issue # (optional)</label>
+              <input id="issueNumber" placeholder="e.g. 123" />
+            </div>
+            <div class="field-row inline">
+              <label><input id="dryRunInternal" type="checkbox" /> Dry run</label>
+              <label><input id="ensureIssue" type="checkbox" checked /> Ensure issue exists</label>
+            </div>
+            <button id="runInternalBtn">Run Internal Flow</button>
+          </article>
+
+          <article class="card">
+            <h2>Fork Workflow</h2>
+            <div class="field-row">
+              <label>Upstream Owner</label>
+              <input id="upstreamOwner" placeholder="owner" />
+            </div>
+            <div class="field-row">
+              <label>Upstream Repo</label>
+              <input id="upstreamRepo" placeholder="repo" />
+            </div>
+            <div class="field-row">
+              <label>Issue # (optional)</label>
+              <input id="forkIssueNumber" placeholder="e.g. 123" />
+            </div>
+            <div class="field-row inline">
+              <label><input id="dryRunFork" type="checkbox" checked /> Dry run</label>
+              <label><input id="createIfMissing" type="checkbox" checked /> Create issue if missing</label>
+            </div>
+            <button id="runForkBtn">Run Fork Flow</button>
+          </article>
+
+          <article class="card card-wide terminal-card">
+            <h2>Terminal Output</h2>
+            <div class="terminal-toolbar">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="terminal-title">live-session</span>
+            </div>
+            <pre id="terminalOutput" class="terminal">$ waiting for command...</pre>
+          </article>
+
+          <article class="card mirror-card">
+            <h2>Mirror Component</h2>
+            <div class="ai-state-grid">
+              <div class="ai-state-item">
+                <span>Mode</span>
+                <strong id="stateMode">standby</strong>
+              </div>
+              <div class="ai-state-item">
+                <span>Latency</span>
+                <strong id="stateLatency">0ms</strong>
+              </div>
+              <div class="ai-state-item">
+                <span>Phase</span>
+                <strong id="statePhase">idle</strong>
+              </div>
+              <div class="ai-state-item">
+                <span>Last Status</span>
+                <strong id="stateStatus">none</strong>
+              </div>
+            </div>
+            <div class="mirror-frame">
+              <div id="mirrorText" class="mirror-text">No command yet.</div>
+              <div class="mirror-reflection" id="mirrorReflection"></div>
+              <div class="scanline"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="footer-left">
+          <span class="footer-title">AI PR Terminal</span>
+          <span class="footer-muted">Modern contribution console for autonomous GitHub workflows.</span>
+        </div>
+        <div class="footer-right">
+          <span>Internal + Fork Flows</span>
+          <span class="divider">•</span>
+          <span>Live Mirror State</span>
+        </div>
+      </footer>
+    </main>
+
+    <script src="/web/app.js"></script>
+  </body>
+</html>
