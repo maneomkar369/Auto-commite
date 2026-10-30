@@ -1,157 +1,250 @@
-# AI PR Review + Autonomous PR Generator
+# Auto-commite
 
-FastAPI service with two modes:
+Auto-commite is an AI-powered GitHub automation project that reviews pull requests, identifies fixes, and can autonomously generate and propose code changes using a local LLM workflow.
 
-- PR review mode: listens to pull request webhooks and pushes AI-assisted fixes to PR branches.
-- Autonomous mode: scans open issues, generates fixes via LLM, validates, pushes a branch, and opens a PR.
+It supports two core modes:
 
-- Your own repos → push branch directly + open PR
-- Other public repos → fork → fix → open PR to original
-- LLM → Ollama running Mistral locally (zero API cost)
+- PR review automation: listens to pull request webhooks and applies AI-assisted fixes to the relevant branch.
+- Autonomous issue-to-PR workflow: finds issues, builds a fix with an LLM, validates the result, and opens a PR.
+
+The project is designed to work well with GitHub repositories you own as well as fork-based contribution workflows for public repositories.
+
+## Why this project exists
+
+Many small engineering teams need a lightweight way to automate repetitive code repair workflows without depending on expensive hosted AI APIs. Auto-commite aims to make that possible using:
+
+- GitHub webhooks and GitHub API access
+- FastAPI for the automation service
+- Ollama-based local LLM inference
+- Temporary repository workspaces for validation and patch generation
+- Automated PR creation and issue closure workflows
+
+## Features
+
+- Pull request review handling for GitHub webhook events
+- AI-assisted fix generation based on repository context and issue details
+- Validation through project tests and local checks before publishing a patch
+- Support for direct-repo and fork-based contribution flows
+- Background automation endpoints for scheduled or queued runs
+- Minimal dependency stack and local-first LLM setup
 
 ## Architecture
 
-GitHub Webhook → FastAPI Server → LLM API → GitHub API → Pull Request
+```text
+GitHub Repository
+      │
+      ▼
+GitHub Webhook
+      │
+      ▼
+FastAPI Server
+      │
+      ├── Handles PR events
+      ├── Runs autonomous issue workflows
+      ├── Validates code changes
+      └── Opens PRs / pushes branches
+      │
+      ▼
+Local LLM (Ollama)
+      │
+      ▼
+GitHub API
+```
 
-Autonomous Mode: Issues → Context Builder → LLM Fix Generator → Validation → Branch/Commit/Push → Pull Request
+The system does not require a third-party model provider by default. It can work with a local Ollama instance, which keeps the solution inexpensive and configurable in private environments.
 
-## 1) Prerequisites
+## Repository structure
+
+```text
+.
+├── autonomous_pr.py         # autonomous issue-to-PR workflow
+├── fork_pr.py               # fork-based contribution flow
+├── github_utils.py           # GitHub helpers and repo operations
+├── handler.py               # pull request event handling
+├── llm_solver.py            # LLM prompt / response extraction logic
+├── push_fix.py              # push and branch patch logic
+├── server.py                # FastAPI app and webhook endpoints
+├── requirements.txt         # Python dependencies
+├── pytest.ini               # pytest configuration
+├── .env.example             # sample environment configuration
+├── .gitignore               # ignore rules for local secrets and cache files
+├── README.md                # project documentation
+├── web/
+│   ├── app.js
+│   ├── index.html
+│   └── styles.css
+├── tests/
+│   └── test_module_imports.py
+└── .venv/                   # local virtual environment (not committed in production use)
+```
+
+## Prerequisites
+
+Before running the project, make sure you have:
 
 - Python 3.10+
-- GitHub personal access token with repo write access
-- Ollama running locally or remotely
-- Public callback URL (e.g., ngrok in local dev)
+- Git installed
+- A GitHub personal access token with repository write access
+- An Ollama instance running locally or on a reachable host
+- A public callback URL if using GitHub webhooks from a local machine (for example, through ngrok)
 
-## 2) Setup
+## Setup
+
+1. Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+```
+
+2. Install dependencies:
+
+```bash
 pip install -r requirements.txt
+```
+
+3. Copy the sample environment file and fill in your values:
+
+```bash
 cp .env.example .env
 ```
 
-Fill `.env` values:
+4. Update the variables in `.env`:
 
-- `GITHUB_TOKEN`
-- `GITHUB_WEBHOOK_SECRET`
-- `REPO_OWNER`
-- `REPO_NAME`
-- `OLLAMA_URL` (optional, default: `http://localhost:11434`)
-- `OLLAMA_MODEL` (optional, default: `qwen3.5:397b-cloud`)
-- `AUTONOMOUS_LABELS` (default: `bug,enhancement`)
-- `AUTONOMOUS_MAX_ISSUES` (default: `10`)
-- `AUTONOMOUS_RUN_TESTS` (default: `true`)
-- `AUTONOMOUS_DRY_RUN` (default: `false`)
-- `AUTONOMOUS_REQUIRE_APPROVAL` (default: `true`, creates draft PRs)
-- `AUTONOMOUS_GIT_NAME` / `AUTONOMOUS_GIT_EMAIL` (commit identity)
+```env
+GITHUB_TOKEN=your_github_token
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
+REPO_OWNER=your-github-username
+REPO_NAME=your-repository
 
-Start Ollama and ensure your model is available:
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3.5:397b-cloud
+
+AUTONOMOUS_LABELS=bug,enhancement
+AUTONOMOUS_MAX_ISSUES=10
+AUTONOMOUS_RUN_TESTS=true
+AUTONOMOUS_DRY_RUN=false
+AUTONOMOUS_REQUIRE_APPROVAL=true
+AUTONOMOUS_GIT_NAME=ai-pr-bot
+AUTONOMOUS_GIT_EMAIL=ai-pr-bot@example.com
+```
+
+5. Ensure the required model is available in Ollama:
 
 ```bash
 ollama run qwen3.5:397b-cloud
 ```
 
-## 3) Run locally
+## Running the app locally
+
+Start the FastAPI server:
 
 ```bash
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-Expose with ngrok:
+For public webhook testing with GitHub, expose the local server using a tunnel:
 
 ```bash
 ngrok http 8000
 ```
 
-## 4) Configure GitHub Webhook
+Then use the public URL in your webhook configuration.
 
-Repository → Settings → Webhooks → Add webhook
+## GitHub webhook configuration
 
+In the GitHub repository settings:
+
+- Go to Settings → Webhooks → Add webhook
 - Payload URL: `https://<your-public-url>/webhook`
 - Content type: `application/json`
-- Secret: same as `GITHUB_WEBHOOK_SECRET`
-- Events: **Pull requests**
+- Secret: the same value as `GITHUB_WEBHOOK_SECRET`
+- Event type: Pull requests
 
-## 5) Trigger events
-
-The bot processes PR actions:
+The app listens for these actions:
 
 - `opened`
 - `synchronize`
 - `reopened`
 
-## 6) Run autonomous issue → PR flow
+## API endpoints
 
-Run once synchronously (returns full result):
+The project exposes a few useful endpoints:
+
+### Health
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+### Run autonomous workflow now
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/autonomous/run-now"
 ```
 
-Run specific issue number:
+### Run autonomous workflow for a specific issue
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/autonomous/run-now?issue_number=123"
 ```
 
-Queue as background task:
+### Queue background automation
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/autonomous/run?dry_run=true"
 ```
 
-Create issue if none exists, solve it, and close it after PR creation:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/autonomous/ensure-run-now"
-```
-
-Background mode for the same workflow:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/autonomous/ensure-run"
-```
-
-## 7) Contribute to other people's repos (fork workflow)
-
-This mode follows standard GitHub contribution flow:
-
-1. Fork upstream repo to your account
-2. Clone your fork and create branch
-3. Generate AI fix for selected/open issue
-4. Commit + push to fork
-5. Open PR from fork branch to upstream default branch
-6. Optionally close issue after PR creation
-
-Run synchronously:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/autonomous/fork-run-now?upstream_owner=OWNER&upstream_repo=REPO"
-```
-
-Run in dry-run mode:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/autonomous/fork-run-now?upstream_owner=OWNER&upstream_repo=REPO&dry_run=true"
-```
-
-Queue background run:
+### Fork-based workflow
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/autonomous/fork-run?upstream_owner=OWNER&upstream_repo=REPO"
 ```
 
-## Notes
+## Typical usage flow
 
-- The handler runs in FastAPI background tasks to return webhook responses quickly.
-- The branch clone is temporary (`/tmp/repo_<pr_number>`) and cleaned after processing.
-- If the LLM returns no issues, the bot posts a positive review comment.
+### 1. PR review mode
 
-## Next enhancements
+- A pull request is opened or updated.
+- GitHub sends a webhook to the service.
+- The app analyzes the event and invokes the review and fix logic.
+- A patch is generated and pushed back to the PR branch or a temporary branch.
 
-- Queue orchestration (Celery + Redis)
-- Diff-only context selection for lower token usage
-- Sandbox execution in Docker
-- Risk scoring and policy gates before PR creation
-- CI status-aware retries and feedback loop
+### 2. Autonomous issue mode
+
+- The service fetches open issues.
+- It selects a suitable task.
+- The LLM proposes a fix.
+- The code is validated locally.
+- A branch is created and pushed.
+- A pull request is opened, and the issue can be closed if configured.
+
+## Security notes
+
+- Never commit secrets or personal access tokens into the repository.
+- Keep your `.env` file local and untracked.
+- Use GitHub secret scanning and repository protections where possible.
+- Prefer using environment variables or secure secret stores in production systems.
+
+## Development notes
+
+- Background tasks are used to process webhook requests quickly.
+- Temporary repositories are created under `/tmp` during automation runs and cleaned up after processing.
+- The project uses local LLM inference for lower operational cost and easier experimentation.
+
+## Contribution
+
+Contributions are welcome. For a clean workflow:
+
+```bash
+git checkout -b feature/my-improvement
+# make changes
+pytest
+git add .
+git commit -m "feat: improve automatic fix flow"
+git push origin feature/my-improvement
+```
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
